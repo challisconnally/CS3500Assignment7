@@ -94,7 +94,23 @@ namespace LibraryWebServer.Controllers
 
             // TODO: Implement
 
+            using (Team14LibraryContext db = new Team14LibraryContext())
+            {
+                var query =
+                from t in db.Titles
+                join i in db.Inventory on t.Isbn equals i.Isbn into inv
+                from IT in inv.DefaultIfEmpty()
+                join c in db.CheckedOut on IT.Serial equals c.Serial into chkOut
+                from stuff in chkOut.DefaultIfEmpty()
+                join p in db.Patrons on stuff.CardNum equals p.CardNum into books
+                from b in books.DefaultIfEmpty()
+                select new { isbn = stuff};
+                
 
+
+                foreach (var v in query)
+                    System.Diagnostics.Debug.WriteLine(v);
+            }
 
             return Json( null );
 
