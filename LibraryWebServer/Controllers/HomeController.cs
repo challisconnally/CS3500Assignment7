@@ -110,7 +110,7 @@ namespace LibraryWebServer.Controllers
                     title = t.Title,
                     author = t.Author,
                     serial = IT == null ? null : (uint?)IT.Serial,
-                    name = b == null ? null : (string?)b.Name
+                    name = b == null ? "" : b.Name
                             };
 
                 foreach (var v in query)
