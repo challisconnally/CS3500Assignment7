@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 [assembly: InternalsVisibleTo( "TestProject1" )]
 namespace LibraryWebServer.Controllers
@@ -104,15 +105,19 @@ namespace LibraryWebServer.Controllers
                 from stuff in chkOut.DefaultIfEmpty()
                 join p in db.Patrons on stuff.CardNum equals p.CardNum into books
                 from b in books.DefaultIfEmpty()
-                select new { isbn = stuff};
-                
-
+                select new {
+                    isbn = t.Isbn,
+                    title = t.Title,
+                    author = t.Author,
+                    serial = IT == null ? null : (uint?)IT.Serial,
+                    name = b == null ? null : (string?)b.Name
+                            };
 
                 foreach (var v in query)
                     System.Diagnostics.Debug.WriteLine(v);
-            }
 
-            return Json( null );
+                return Json(query.ToArray());
+            }
 
         }
 
