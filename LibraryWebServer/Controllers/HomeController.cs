@@ -2,9 +2,10 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Xml.Linq;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
-[assembly: InternalsVisibleTo( "TestProject1" )]
+[assembly: InternalsVisibleTo("TestProject1")]
 namespace LibraryWebServer.Controllers
 {
     public class HomeController : Controller
@@ -30,21 +31,23 @@ namespace LibraryWebServer.Controllers
         /// true if the login is accepted, false otherwise.
         /// </returns>
         [HttpPost]
-        public IActionResult CheckLogin( string name, int cardnum )
+        public IActionResult CheckLogin(string name, int cardnum)
         {
-            // TODO: Fill in. Determine if login is successful or not.
+            
             bool loginSuccessful = false;
 
-
+            // sets login successful to true or false based on whether or not that
+            // user exists in the database
             using (Team14LibraryContext db = new Team14LibraryContext())
             {
                 var query =
                 from p in db.Patrons
-                where p.Name == name 
+                where p.Name == name
                 where p.CardNum == cardnum
                 select p;
 
-                if (query.Any())
+                if (query.Any()) // if the query has anything inside of it, then that means 
+                                // we have a valid user logging in
                 {
                     loginSuccessful = true;
                 }
@@ -54,15 +57,15 @@ namespace LibraryWebServer.Controllers
             }
 
 
-            if ( !loginSuccessful )
+            if (!loginSuccessful)
             {
-                return Json( new { success = false } );
+                return Json(new { success = false });
             }
             else
             {
                 user = name;
                 card = cardnum;
-                return Json( new { success = true } );
+                return Json(new { success = true });
             }
         }
 
@@ -76,7 +79,7 @@ namespace LibraryWebServer.Controllers
         {
             user = "";
             card = -1;
-            return Json( new { success = true } );
+            return Json(new { success = true });
         }
 
         /// <summary>
@@ -105,13 +108,14 @@ namespace LibraryWebServer.Controllers
                 from stuff in chkOut.DefaultIfEmpty()
                 join p in db.Patrons on stuff.CardNum equals p.CardNum into books
                 from b in books.DefaultIfEmpty()
-                select new {
+                select new
+                {
                     isbn = t.Isbn,
                     title = t.Title,
                     author = t.Author,
                     serial = IT == null ? null : (uint?)IT.Serial,
                     name = b == null ? "" : b.Name
-                            };
+                };
 
                 foreach (var v in query)
                     System.Diagnostics.Debug.WriteLine(v);
@@ -132,8 +136,31 @@ namespace LibraryWebServer.Controllers
         [HttpPost]
         public ActionResult ListMyBooks()
         {
-            // TODO: Implement
-            return Json( null );
+            using (Team14LibraryContext db = new Team14LibraryContext())
+            {
+                // joins tables and then selects only rows where the users cardnum matches
+                // a checked out book
+                var query =
+                 from t in db.Titles
+                 join i in db.Inventory on t.Isbn equals i.Isbn into inv
+                 from IT in inv.DefaultIfEmpty()
+                 join c in db.CheckedOut on IT.Serial equals c.Serial into chkOut
+                 from d in chkOut.DefaultIfEmpty()
+                 join p in db.Patrons on d.CardNum equals p.CardNum into pat
+                 from b in pat.DefaultIfEmpty()
+                 where b.CardNum == card
+                 select new
+                {
+                    title = t.Title,
+                    author = t.Author,
+                    serial = d.Serial
+                };
+
+                foreach (var v in query)
+                    System.Diagnostics.Debug.WriteLine(v);
+
+                return Json(query.ToArray());
+            }
         }
 
 
@@ -146,12 +173,24 @@ namespace LibraryWebServer.Controllers
         /// <param name="serial">The serial number of the book to check out</param>
         /// <returns>success</returns>
         [HttpPost]
-        public ActionResult CheckOutBook( int serial )
+        public ActionResult CheckOutBook(int serial)
         {
-            // You may have to cast serial to a (uint)
+            using (Team14LibraryContext db = new Team14LibraryContext())
+            {
+                // You may have to cast serial to a (uint)
+                CheckedOut newCheckout = new CheckedOut
+                {
+                    CardNum = (uint)card,
+                    Serial = (uint)serial
+                };
 
+                db.CheckedOut.Add(newCheckout);
 
-            return Json( new { success = true } );
+                db.SaveChanges();
+            }
+               
+
+            return Json(new { success = true });
         }
 
         /// <summary>
@@ -162,11 +201,29 @@ namespace LibraryWebServer.Controllers
         /// <param name="serial">The serial number of the book to return</param>
         /// <returns>Success</returns>
         [HttpPost]
-        public ActionResult ReturnBook( int serial )
+        public ActionResult ReturnBook(int serial)
         {
             // You may have to cast serial to a (uint)
 
-            return Json( new { success = true } );
+            using (Team14LibraryContext db = new Team14LibraryContext())
+            {
+                // You may have to cast serial to a (uint)
+                var query =
+                from c in db.CheckedOut
+                where c.CardNum == card
+                where c.Serial == serial
+                select c;
+
+                if (query.Any())
+                {
+                    db.CheckedOut.Remove(query.SingleOrDefault());
+                    db.SaveChanges();
+                }
+                
+                
+            }
+
+            return Json(new { success = true });
         }
 
 
@@ -177,8 +234,8 @@ namespace LibraryWebServer.Controllers
 
         public IActionResult Index()
         {
-            if ( user == "" && card == -1 )
-                return View( "Login" );
+            if (user == "" && card == -1)
+                return View("Login");
 
             return View();
         }
@@ -204,13 +261,13 @@ namespace LibraryWebServer.Controllers
         /// <returns></returns>
         public IActionResult MyBooks()
         {
-            if ( user == "" && card == -1 )
-                return View( "Login" );
+            if (user == "" && card == -1)
+                return View("Login");
 
             return View();
         }
 
-        public HomeController( ILogger<HomeController> logger )
+        public HomeController(ILogger<HomeController> logger)
         {
             _logger = logger;
         }
@@ -220,10 +277,10 @@ namespace LibraryWebServer.Controllers
             return View();
         }
 
-        [ResponseCache( Duration = 0, Location = ResponseCacheLocation.None, NoStore = true )]
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
-            return View( new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier } );
+            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
     }
 }
